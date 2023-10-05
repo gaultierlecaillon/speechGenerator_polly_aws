@@ -1,21 +1,45 @@
-from gtts import gTTS
+import boto3
+from pygame import mixer
+import io
 import os
+from dotenv import load_dotenv
 
-def text_to_speech(text, lang='fr', output_file='output.mp3'):
-    """
-    Convert text to speech using gTTS and save it to an output file.
+# Load environment variables from .env file
+load_dotenv()
 
-    :param text: Text to convert to speech.
-    :param lang: Language to use for the speech. Default is 'en' (English).
-    :param output_file: The filename to save the speech audio. Default is 'output.mp3'.
-    """
+
+def aws_polly_speak(text):
+    # Retrieve AWS credentials from environment variables
+    aws_access_key = os.getenv('AWS_ACCESS_KEY')
+    aws_secret_key = os.getenv('AWS_SECRET_KEY')
+    aws_region = os.getenv('AWS_REGION')
+
+    # Initialize a session using Amazon Polly
+    polly_client = boto3.Session(
+        aws_access_key_id=aws_access_key,
+        aws_secret_access_key=aws_secret_key,
+        region_name=aws_region).client('polly')
+
     try:
-        tts = gTTS(text=text, lang=lang, slow=False)
-        tts.save(output_file)
-        print(f"File saved as {output_file}")
+        # Request speech synthesis
+        response = polly_client.synthesize_speech(VoiceId='Joanna',
+                                                  OutputFormat='mp3',
+                                                  Text=text)
+
+        # Play the generated speech using pygame
+        soundfile = io.BytesIO(response['AudioStream'].read())
+        mixer.init()
+        mixer.music.load(soundfile)
+        mixer.music.play()
+
+        # Keep the script alive until audio playback is done
+        while mixer.music.get_busy() == True:
+            pass
+
     except Exception as e:
-        print("Error:", str(e))
+        print(str(e))
+
 
 if __name__ == "__main__":
-    text = input("Enter the text to convert to speech: ")
-    text_to_speech(text)
+    text = "Hello, how can I assist you today?"
+    aws_polly_speak(text)
